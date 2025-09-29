@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>웹캠 방송 + 채팅</title>
+  <style>
+    #myVideo, #remoteVideo { width: 320px; }
+    #chat { border: 1px solid #ccc; height: 180px; overflow-y: auto; margin:10px 0; }
+    #input { width: 210px; }
+  </style>
+</head>
+<body>
+  <h3>내 웹캠</h3>
+  <video id="myVideo" autoplay muted playsinline></video>
+  <!--<h3>상대방 화면</h3>
+  <video id="remoteVideo" autoplay playsinline></video>-->
+  <h3>채팅</h3>
+  <div id="chat"></div>
+  <input id="input" autocomplete="off" placeholder="메시지 입력" />
+  <button id="send">전송</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // --- 채팅 ---
+    const socket = io();
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+
+    function appendMessage(msg) {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    send.onclick = () => {
+      if (input.value.trim()) {
+        socket.emit('chat message', input.value);
+        input.value = '';
+      }
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send.onclick(); });
+    socket.on('chat message', appendMessage);
+
+    // --- WebRTC (P2P 영상) ---
+    const myVideo = document.getElementById('myVideo');
+    // const remoteVideo = document.getElementById('remoteVideo');
+    let myStream;
+    let peerConnection;
+    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    async function startCamera() {
+      myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      myVideo.srcObject = myStream;
+      socket.emit('signal', { type: 'join' });
+    }
+
+	/*
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(config);
+      myStream.getTracks().forEach(track => peerConnection.addTrack(track, myStream));
+      peerConnection.ontrack = e => { remoteVideo.srcObject = e.streams[0]; };
+      peerConnection.onicecandidate = e => {
+        if (e.candidate) socket.emit('signal', { type: 'candidate', candidate: e.candidate });
+      };
+    }
+
+    socket.on('signal', async (data) => {
+      if (data.type === 'join') {
+        createPeerConnection();
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        socket.emit('signal', { type: 'offer', sdp: offer });
+      }
+      if (data.type === 'offer') {
+        createPeerConnection();
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit('signal', { type: 'answer', sdp: answer });
+      }
+      if (data.type === 'answer') {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+      }
+      if (data.type === 'candidate' && peerConnection) {
+        try {
+          await peerConnection.addIceCandidate(data.candidate);
+        } catch {}
+      }
+    });
+	*/
+
+    startCamera();
+  </script>
+</body>
+</html>
